@@ -26,5 +26,3 @@ def getnextgames(key):
     )
 
     print(response.text)
-
-getnextgames("AIzaSyCS0t43OCAAWRJTcv84kgceFiA6WzFxMXk")
