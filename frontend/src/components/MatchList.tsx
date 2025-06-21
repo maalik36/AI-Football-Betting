@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/lib/api';
-import { GamesResponse, EnhancedMatch } from '@/types/api';
+import { GamesResponse, EnhancedMatch, Match } from '@/types/api';
 
 export function MatchList() {
   const [gamesData, setGamesData] = useState<GamesResponse | null>(null);
@@ -59,6 +59,16 @@ export function MatchList() {
     );
   }
 
+  // Parse raw games if enhanced data is not available
+  let games: Match[] = [];
+  try {
+    if (!gamesData.enhanced_matches || gamesData.enhanced_matches.length === 0) {
+      games = JSON.parse(gamesData.raw_games);
+    }
+  } catch (e) {
+    console.error('Failed to parse raw games:', e);
+  }
+
   const hasEnhancedMatches = Array.isArray(gamesData.enhanced_matches) && gamesData.enhanced_matches.length > 0;
 
   return (
@@ -83,14 +93,50 @@ export function MatchList() {
         </Card>
       )}
 
-      {!hasEnhancedMatches && (
-        <Card>
+      {/* Show basic cards when no enhanced data */}
+      {!hasEnhancedMatches && games.map((game, index) => (
+        <Card key={index} className="hover:shadow-md transition-shadow">
           <CardContent className="p-6">
-            <div className="text-center text-gray-500">No enhanced match data available</div>
+            <div className="flex flex-col space-y-4">
+              {/* Teams */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                    <span className="text-lg font-bold">{game.home_team.split(' ')[0]}</span>
+                  </div>
+                  <span className="font-semibold text-lg">{game.home_team}</span>
+                </div>
+                <div className="flex flex-col items-center space-y-1">
+                  <span className="text-gray-500 font-bold">VS</span>
+                  <Badge variant="outline" className="mt-1">{game.competition}</Badge>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <span className="font-semibold text-lg">{game.away_team}</span>
+                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                    <span className="text-lg font-bold">{game.away_team.split(' ')[0]}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Date and Time */}
+              <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+                <span className="font-medium">{game.date}</span>
+                <span>•</span>
+                <span>{game.time}</span>
+              </div>
+
+              {/* Stadium Info if available */}
+              {game.home_team.includes('(') && (
+                <div className="text-center text-sm text-gray-500">
+                  🏟️ {game.home_team.match(/\((.*?)\)/)?.[1] || ''}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
-      )}
+      ))}
 
+      {/* Show enhanced cards if available */}
       {hasEnhancedMatches && gamesData.enhanced_matches.map((match, index) => (
         <Card key={index} className="hover:shadow-md transition-shadow">
           <CardContent className="p-6">

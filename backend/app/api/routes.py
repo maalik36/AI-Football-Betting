@@ -34,10 +34,10 @@ def get_prediction_agent():
 # Games Routes
 @router.get("/games/next")
 async def get_next_games():
-    """Get next 5 games using Gemini AI"""
+    """Get next 5 games with enhanced NFL data"""
     try:
         print("Received request for /games/next")
-        games = await getnextgames(settings.GEMINI_API_KEY)
+        games = await getnextgames()
         print("Games response:", games)
         return games
     except Exception as e:

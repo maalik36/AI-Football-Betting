@@ -1,9 +1,9 @@
 import csv
-from google import genai
 from typing import Dict, Any, List
 import json
 import os
 from datetime import datetime
+from .nfl_api_service import nfl_api
 
 def parse_csv_games(csv_data: str) -> List[Dict[str, Any]]:
     """Parse CSV data into a list of games"""
@@ -27,106 +27,131 @@ def parse_csv_games(csv_data: str) -> List[Dict[str, Any]]:
                     "away_team": away_team,
                     "date": row.get('Date', ''),
                     "time": time,
-                    "competition": "NFL 2025"  # Since all games are NFL
+                    "competition": "NFL 2025",  # Since all games are NFL
+                    "season": row.get("season", "")
                 })
     return games
 
-async def enhance_games_data(client: genai.Client, games: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Enhance games data with team logos and descriptions"""
-    try:
-        # Create a more structured prompt for better results
-        prompt = """
-        You are a sports data enhancer. Given these NFL matches:
-        {}
+async def enhance_games_data(games: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Enhance games data with team info from NFL API"""
+    enhanced_matches = []
+    
+    for game in games:
+        # Get team information from NFL API
+        home_team_info = await nfl_api.get_team_info(game["home_team"])
+        away_team_info = await nfl_api.get_team_info(game["away_team"])
         
-        Generate enhanced data for each match including:
-        1. Team logos (using NFL's CDN)
-        2. A brief description
-        3. Key players
-        4. Rivalry history
+        # Get team stats
+        home_team_stats = await nfl_api.get_team_stats(game["home_team"])
+        away_team_stats = await nfl_api.get_team_stats(game["away_team"])
         
-        Format your response EXACTLY as a JSON object with this structure:
-        {{
-            "matches": [
-                {{
-                    "original_data": <input match object>,
-                    "home_team_logo": "https://static.www.nfl.com/t_headshot_desktop/f_auto/league/api/clubs/logos/<team>",
-                    "away_team_logo": "https://static.www.nfl.com/t_headshot_desktop/f_auto/league/api/clubs/logos/<team>",
-                    "match_description": "string",
-                    "key_players": ["string"],
-                    "rivalry_history": "string"
-                }}
-            ]
-        }}
-        
-        ONLY respond with the JSON. No other text.
-        """.format(json.dumps(games, indent=2))
-
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            generation_config={
-                "temperature": 0.3,
-                "candidate_count": 1,
-                "stop_sequences": ["}}}"],
-                "max_output_tokens": 2048,
+        # Create enhanced match data
+        enhanced_match = {
+            "original_data": game,
+            "home_team_logo": home_team_info.get('logo_url'),
+            "away_team_logo": away_team_info.get('logo_url'),
+            "match_description": generate_match_description(
+                home_team_info,
+                away_team_info,
+                game["date"],
+                game["time"]
+            ),
+            "key_players": ["Star players to be announced"],
+            "rivalry_history": generate_rivalry_description(home_team_stats, away_team_stats),
+            "home_team_info": {
+                **home_team_info,
+                **home_team_stats
+            },
+            "away_team_info": {
+                **away_team_info,
+                **away_team_stats
             }
-        )
-        
-        response_text = response.text.strip()
-        print("Gemini raw response:", response_text)  # Debug log
-        
-        try:
-            enhanced_data = json.loads(response_text)
-            if "matches" in enhanced_data and len(enhanced_data["matches"]) > 0:
-                return enhanced_data["matches"]
-        except json.JSONDecodeError as e:
-            print(f"Failed to parse Gemini response: {e}")
-        
-        # If we get here, create default enhanced data
-        team_logos = {
-            "Eagles": "PHI",
-            "Cowboys": "DAL",
-            "Chiefs": "KC",
-            "Chargers": "LAC",
-            "Falcons": "ATL",
-            "Buccaneers": "TB",
-            "Browns": "CLE",
-            "Bengals": "CIN",
-            "Colts": "IND",
-            "Dolphins": "MIA"
         }
-        
-        def get_team_code(team_name: str) -> str:
-            for key, value in team_logos.items():
-                if key in team_name:
-                    return value
-            return "NFL"  # Default fallback
-        
-        return [
-            {
-                "original_data": game,
-                "home_team_logo": f"https://static.www.nfl.com/t_headshot_desktop/f_auto/league/api/clubs/logos/{get_team_code(game['home_team'])}",
-                "away_team_logo": f"https://static.www.nfl.com/t_headshot_desktop/f_auto/league/api/clubs/logos/{get_team_code(game['away_team'])}",
-                "match_description": f"Week 1 NFL matchup between {game['home_team']} and {game['away_team']}. Both teams looking to start their 2025 season with a victory.",
-                "key_players": ["Loading team rosters..."],
-                "rivalry_history": f"Historic matchup between {game['home_team']} and {game['away_team']} in the NFL."
-            }
-            for game in games
-        ]
-        
-    except Exception as e:
-        print(f"Error in enhance_games_data: {str(e)}")
-        return []
+        enhanced_matches.append(enhanced_match)
+    
+    return enhanced_matches
 
-async def getnextgames(key: str) -> Dict[str, Any]:
-    """Get next 5 games using Gemini AI"""
+def generate_match_description(home_info: Dict[str, Any], away_info: Dict[str, Any], date: str, time: str) -> str:
+    """Generate a description for the match"""
+    home_name = home_info.get('name', 'Unknown Team')
+    away_name = away_info.get('name', 'Unknown Team')
+    home_location = home_info.get('location', '')
+    stadium = home_info.get('stadium', 'Unknown Stadium')
+    
+    return f"{home_name} hosts {away_name} at {stadium} on {date} at {time}. A matchup between NFL teams, featuring {home_location} against the visiting {away_name}."
+
+def generate_rivalry_description(home_info: Dict[str, Any], away_info: Dict[str, Any]) -> str:
+    """Generate a description of the rivalry between the teams"""
+    home_name = home_info.get('name', 'Unknown Team')
+    away_name = away_info.get('name', 'Unknown Team')
+    home_division = home_info.get('division', 'Unknown')
+    away_division = away_info.get('division', 'Unknown')
+    
+    if home_division == away_division and home_division != 'Unknown':
+        return f"Divisional rivalry matchup between {home_name} and {away_name} in the {home_division} division."
+    else:
+        return f"NFL matchup between {home_name} and {away_name}."
+
+def get_team_logo(team_name: str) -> str:
+    """Get the team logo URL based on team name"""
+    team_logos = {
+        "Eagles": "PHI",
+        "Cowboys": "DAL",
+        "Chiefs": "KC",
+        "Chargers": "LAC",
+        "Falcons": "ATL",
+        "Buccaneers": "TB",
+        "Browns": "CLE",
+        "Bengals": "CIN",
+        "Colts": "IND",
+        "Dolphins": "MIA"
+    }
+    
+    # Get team code
+    team_code = "NFL"  # Default fallback
+    for key, value in team_logos.items():
+        if key in team_name:
+            team_code = value
+            break
+    
+    return f"https://static.www.nfl.com/t_headshot_desktop/f_auto/league/api/clubs/logos/{team_code}"
+
+def create_default_enhanced_data(games: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Create default enhanced data when Gemini fails"""
+    default_descriptions = {
+        "Eagles": "Known for their strong offensive line and passionate fanbase",
+        "Cowboys": "America's Team with a rich history of success",
+        "Chiefs": "High-powered offense led by Patrick Mahomes",
+        "Chargers": "Dynamic team with explosive playmakers",
+        "Falcons": "Looking to rebuild and return to playoff contention",
+        "Buccaneers": "Strong defensive unit with playoff aspirations",
+        "Browns": "Built around a strong running game and defense",
+        "Bengals": "Young and talented team with explosive offense",
+        "Colts": "Team in transition with promising young talent",
+        "Dolphins": "Fast-paced offense with dynamic playmakers"
+    }
+    
+    def get_team_description(team_name: str) -> str:
+        for key, desc in default_descriptions.items():
+            if key in team_name:
+                return desc
+        return "Looking to make their mark in the NFL"
+    
+    return [
+        {
+            "original_data": game,
+            "home_team_logo": get_team_logo(game["home_team"]),
+            "away_team_logo": get_team_logo(game["away_team"]),
+            "match_description": f"Week 1 matchup: {get_team_description(game['home_team'])} hosting {get_team_description(game['away_team'])}",
+            "key_players": ["Star players to be announced"],
+            "rivalry_history": f"Historic NFL matchup between {game['home_team']} and {game['away_team']}"
+        }
+        for game in games
+    ]
+
+async def getnextgames() -> Dict[str, Any]:
+    """Get next 5 games with enhanced data"""
     try:
-        if not key:
-            raise ValueError("GEMINI_API_KEY is not set in environment variables")
-            
-        client = genai.Client(api_key=key)
-        
         csv_path = "games.csv"
         if not os.path.exists(csv_path):
             raise FileNotFoundError(f"Required file {csv_path} not found")
@@ -148,19 +173,14 @@ async def getnextgames(key: str) -> Dict[str, Any]:
         # Convert games to JSON string for raw_games
         games_json = json.dumps(next_games, indent=2)
             
-        enhanced_matches = await enhance_games_data(client, next_games)
+        enhanced_matches = await enhance_games_data(next_games)
 
         return {
             "raw_games": games_json,
             "enhanced_matches": enhanced_matches,
-            "count": len(next_games),
-            "source": "CSV + Gemini AI"
+            "source": "CSV + RapidAPI NFL Data"
         }
         
     except Exception as e:
-        error_msg = str(e)
-        if "API key not valid" in error_msg.lower():
-            error_msg = "Invalid Gemini API key"
-        elif "quota exceeded" in error_msg.lower():
-            error_msg = "Gemini API quota exceeded"
-        return {"error": f"Failed to get next games: {error_msg}"}
+        print(f"Error in getnextgames: {str(e)}")
+        raise
