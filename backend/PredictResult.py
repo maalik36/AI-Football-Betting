@@ -5,7 +5,7 @@ def getAns(key, teams):
     client = genai.Client(api_key=key)
 
 
-    csv_path = "C:\\Users\\guyiz\\Downloads\\21SeasonData.csv"
+    csv_path = "backend\\21SeasonData.csv"
     with open(csv_path, "r") as f:
         csv_data = f.read()
 
