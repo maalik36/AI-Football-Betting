@@ -5,7 +5,7 @@ def getnextgames(key):
     client = genai.Client(api_key=key)
 
 
-    csv_path = "getgames\\games.csv"
+    csv_path = "backend\\games.csv"
     with open(csv_path, "r") as f:
         csv_data = f.read()
 
