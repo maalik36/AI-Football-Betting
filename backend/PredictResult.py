@@ -28,4 +28,4 @@ def getAns(key, teams):
 
     print(response.text)
 
-getAns("AIzaSyCS0t43OCAAWRJTcv84kgceFiA6WzFxMXk", ["The Ravens", "The 49ers"])
+
