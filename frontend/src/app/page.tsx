@@ -1,6 +1,7 @@
 'use client';
 
 import { MatchList } from '@/components/MatchList';
+import { AIAnalysis } from '@/components/AIAnalysis';
 
 export default function Home() {
   return (
@@ -11,7 +12,7 @@ export default function Home() {
             AI Football Betting
           </h1>
           <p className="text-gray-600">
-            View upcoming football matches and events
+            View upcoming matches and get AI-powered analysis
           </p>
         </header>
 
@@ -21,6 +22,13 @@ export default function Home() {
               Upcoming Matches
             </h2>
             <MatchList />
+          </div>
+
+          <div className="mb-6">
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+              AI Analysis
+            </h2>
+            <AIAnalysis />
           </div>
         </div>
       </div>

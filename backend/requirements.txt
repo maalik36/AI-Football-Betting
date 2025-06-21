@@ -1,5 +1,10 @@
 fastapi
 uvicorn[standard]
 pydantic
+pydantic-settings
 python-dotenv
+pandas
+google-cloud-aiplatform
+google-auth
 google-genai
+vertexai
