@@ -1,0 +1,30 @@
+import csv
+from google import genai
+
+def getnextgames(key):
+    client = genai.Client(api_key=key)
+
+
+    csv_path = "getgames\\games.csv"
+    with open(csv_path, "r") as f:
+        csv_data = f.read()
+
+
+    csv_data_snippet = csv_data
+
+    prompt = f"""
+
+
+    {csv_data_snippet}
+
+    Please output the next 5 games, based on the current date, and assuming that all these games are in the year 2025. Do not output anything extra. Just the games, nothing else. Make the output a json file.
+    """
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt
+    )
+
+    print(response.text)
+
+getnextgames("AIzaSyCS0t43OCAAWRJTcv84kgceFiA6WzFxMXk")
