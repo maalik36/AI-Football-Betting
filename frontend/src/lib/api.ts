@@ -10,7 +10,10 @@ export class ApiClient {
   }
 
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+    const url = `${this.baseUrl}${endpoint}`;
+    console.log('Making API request to:', url);
+    
+    const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
         ...options?.headers,
@@ -18,12 +21,19 @@ export class ApiClient {
       ...options,
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-      throw new Error(errorData.detail || `API request failed: ${response.statusText}`);
+    const data = await response.json();
+    console.log('API response:', data);
+    
+    // Check for error in response data
+    if ('error' in data) {
+      throw new Error(data.error);
     }
 
-    return response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || `API request failed: ${response.statusText}`);
+    }
+
+    return data;
   }
 
   async getMatches(): Promise<GamesResponse> {

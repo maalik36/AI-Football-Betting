@@ -36,9 +36,12 @@ def get_prediction_agent():
 async def get_next_games():
     """Get next 5 games using Gemini AI"""
     try:
+        print("Received request for /games/next")
         games = await getnextgames(settings.GEMINI_API_KEY)
+        print("Games response:", games)
         return games
     except Exception as e:
+        print("Error in /games/next:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 # Stats Agent Routes
